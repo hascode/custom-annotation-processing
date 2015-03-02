@@ -12,5 +12,5 @@ import java.lang.annotation.Target;
 public @interface Dao {
 	Class<?> entity();
 
-	Class<?> idClass() default Long.class;
+	String daoSuffix() default "Dao";
 }

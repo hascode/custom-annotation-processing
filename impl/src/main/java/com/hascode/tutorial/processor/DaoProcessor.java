@@ -1,8 +1,6 @@
 package com.hascode.tutorial.processor;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.Writer;
 import java.util.Set;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -13,13 +11,16 @@ import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
-import javax.tools.JavaFileObject;
 
 import com.hascode.tutorial.annotation.Dao;
+import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.TypeSpec;
 
 @SupportedAnnotationTypes({ "com.hascode.tutorial.annotation.Dao" })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
@@ -41,35 +42,26 @@ public class DaoProcessor extends AbstractProcessor {
 					entityElement = processingEnv.getTypeUtils().asElement(typeMirror);
 					fqEntityClassName = entityElement.toString();
 				}
-				String fqIdClassName = null;
+				String daoSuffix = e.getAnnotation(Dao.class).daoSuffix();
+				messager.printMessage(Diagnostic.Kind.NOTE, "dao annotation on type " + e.toString() + " found. entity is " + fqEntityClassName + " and the designated suffix is: " + daoSuffix);
 				try {
-					fqIdClassName = e.getAnnotation(Dao.class).idClass().getName();
-				} catch (MirroredTypeException mte) {
-					TypeMirror typeMirror = mte.getTypeMirror();
-					fqIdClassName = processingEnv.getTypeUtils().asElement(typeMirror).toString();
-				}
-				messager.printMessage(Diagnostic.Kind.NOTE, "dao annotation on type " + e.toString() + " found. entity is " + fqEntityClassName + " and has an id of type: " + fqIdClassName);
-				try {
-					JavaFileObject f = processingEnv.getFiler().createSourceFile(fqEntityClassName + "Dao");
-					processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE, "Creating " + f.toUri());
-					Writer w = f.openWriter();
-					try {
-						PrintWriter pw = new PrintWriter(w);
-						pw.println("package com.hascode.tutorial.app;");
-						pw.println("public class BookDao {");
-						pw.println("    public void print() {");
-						pw.println("        System.out.println(\"Helo world!\");");
-						pw.println("    }");
-						pw.println("}");
-						pw.flush();
-					} finally {
-						w.close();
-					}
+					TypeSpec dao = createDao("BookDao");
+					JavaFile javaFile = JavaFile.builder("com.hascode.tutorial.app", dao).build();
+					javaFile.writeTo(filer);
 				} catch (IOException x) {
 					processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, x.toString());
 				}
 			}
 		}
 		return true;
+	}
+
+	private TypeSpec createDao(final String className) {
+		return TypeSpec.classBuilder(className).addModifiers(Modifier.PUBLIC).addMethod(createMethod("create")).addMethod(createMethod("read")).addMethod(createMethod("update"))
+				.addMethod(createMethod("delete")).build();
+	}
+
+	private MethodSpec createMethod(final String name) {
+		return MethodSpec.methodBuilder(name).addModifiers(Modifier.PUBLIC).addStatement("$T.out.println($S)", System.class, "Generated method.").returns(void.class).build();
 	}
 }
